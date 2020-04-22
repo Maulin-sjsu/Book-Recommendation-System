@@ -14,7 +14,7 @@ library(ggplot2)    #Visualisation
 library(dplyr)      #Dataframe operations
 library(caret)      #Models
 library(quanteda)   #Tokenizing text into words
-library(rpart)      #Decision Tree
+#library(rpart)      #Decision Tree
 library(janitor)    #Validating colnames of dataframe
 library(partykit)   #Visualizing Decision Tree
 
@@ -34,7 +34,7 @@ ui <- navbarPage("Book Recommendation System",
                                 )
                          ),
                          column(3,
-                                radioButtons("radio", h3("Radio buttons"),
+                                radioButtons("radio", h3("Ratings"),
                                              choices = list("Ratings more then  4" = 4,
                                                             "Ratings more then  4.2" = 4.2,
                                                             "Ratings more then  4.4" = 4.4,
@@ -52,7 +52,7 @@ ui <- navbarPage("Book Recommendation System",
                              )
                          )
                      ))),
-                 tabPanel("Component 2",fluidPage(
+                 tabPanel("Language based Analysis",fluidPage(
                      
                      titlePanel("Book"),
                      fluidRow(
@@ -66,7 +66,7 @@ ui <- navbarPage("Book Recommendation System",
                                 )
                          ),
                          column(3,
-                                radioButtons("radio1", h3("Radio buttons"),
+                                radioButtons("radio1", h3("Ratings"),
                                              choices = list("Ratings more then  3 " = 3,
                                                             "Ratings more then  3.5 " = 3.5,
                                                             "Ratings more then  4 " = 4),selected = 3))
@@ -75,7 +75,7 @@ ui <- navbarPage("Book Recommendation System",
                      
                      mainPanel(
                          fluidRow(
-                             column(11,offset = 1,
+                             column(12,offset = 0,
                                     tabsetPanel(
                                         tabPanel("Plot", plotOutput("distPlot2")), 
                                         tabPanel("Table", tableOutput("table2"))
@@ -84,7 +84,50 @@ ui <- navbarPage("Book Recommendation System",
                          )
                      )
                      )),
-                 tabPanel("Component 3")
+                 tabPanel("Best Publishers",fluidPage(
+                     
+                     titlePanel("Book"),
+                     fluidRow(
+                         column(8, offset = 1, 
+                                sidebarPanel(
+                                    sliderInput("BooksCount2",
+                                                "Number of Books for each author:",
+                                                min = 0,
+                                                max = 150,
+                                                value = 15)
+                                )
+                         ),
+                         column(3,
+                                selectInput("select",  h3("Ratings"),
+                                            choices = list("Ratings more then  3 " = 3,
+                                                           "Ratings more then  3.5 " = 3.5,
+                                                           "Ratings more then  4 " = 4,
+                                                           "Ratings more then  4.5 " = 4.5),selected = 4))
+                     ),
+                     
+                     mainPanel(
+                         fluidRow(
+                             column(12,offset = 0,
+                                    tabsetPanel(
+                                        tabPanel("Plot", plotOutput("distPlot3")), 
+                                        tabPanel("Table", tableOutput("table3"))
+                                    )
+                             )
+                         )
+                     )
+                 )),
+                 
+                 tabPanel("Best",mainPanel(
+                                tabsetPanel(
+                                    tabPanel("Plot", plotOutput("distPlot4")) 
+                                    
+                                )
+                        
+                 )
+                 ),
+                 tabPanel("Component 5")
+                            
+                 
     )
 
     
@@ -185,7 +228,7 @@ server <- function(input, output) {
             geom_bar(aes(x=factor(m$language_code, levels= as.character(m$language_code)),
                          y=lan, fill=avg), stat='identity')+
             geom_hline(yintercept=c(10, 100, 1000, 10000), linetype='dashed', alpha=0.1)+
-            coord_flip()+
+            #coord_flip()+
             scale_y_log10()+
             scale_fill_gradient(low='gray', high='black')+
             labs(y='Number of books in a given language', 
@@ -199,6 +242,74 @@ server <- function(input, output) {
                   legend.title=element_text(size=17), legend.text=element_text(size=13))
     })
     
+    
+    output$distPlot3 <- renderPlot({
+        
+        
+        m <- df %>%
+            group_by(publisher) %>%
+            summarize(avg=mean(average_rating), lan=n()) %>%
+            arrange(desc(lan)) %>%
+            #filter(language_code == 'en-US')
+            filter(lan>input$BooksCount2,avg>input$select)
+    
+        options(repr.plot.width = 18 , repr.plot.height = 10)
+        ggplot(m)+
+            theme_classic()+
+            geom_bar(aes(x=factor(m$publisher, levels= as.character(m$publisher)),
+                         y=lan, fill=avg), stat='identity')+
+            geom_hline(yintercept=c(10, 100, 1000, 10000), linetype='dashed', alpha=0.1)+
+            coord_flip()+
+            scale_y_log10()+
+            scale_fill_gradient(low='gray', high='black')+
+            labs(y='Number of books in a given language', x='Languages', title='Number of books in each language with averaged ratings', 
+                 subtitle='Only languages with more than 5 books', fill='Averaged rating')+
+            theme(axis.text=element_text(size=14), plot.title = element_text(size = 40, face = "bold", hjust=0.5),axis.title=element_text(size=17),
+                  plot.subtitle = element_text(size = 20, face = "bold", hjust=0.48), legend.title=element_text(size=17), legend.text=element_text(size=13))
+    })
+    
+    output$table3 <- renderTable({
+        m <- df %>%
+            group_by(publisher) %>%
+            summarize(avg=mean(average_rating), lan=n()) %>%
+            arrange(desc(avg)) %>%
+            #filter(language_code == 'en-US')
+            filter(lan>input$BooksCount2,avg>input$select)
+        
+        head(m)
+    })
+    
+    output$distPlot4 <- renderPlot({
+    
+    options(repr.plot.width = 18 , repr.plot.height = 13)
+    ggplot(df, aes(text_reviews_count, average_rating))+
+        geom_jitter()+
+        coord_cartesian(ylim=c(2, 5))+
+        scale_x_sqrt()+
+        geom_smooth()+
+        labs(x='Count of text reviews', y='Average rating', title='Checking for correlation', 
+             subtitle='between count of text reviews and average rating')+
+        theme(axis.text=element_text(size=18), plot.title = element_text(size = 40, face = "bold", hjust=0.5),axis.title=element_text(size=30),
+              plot.subtitle = element_text(size = 30, face = "bold", hjust=0.48))
+    
+    
+    ggplot(df, aes(ratings_count, average_rating))+
+        geom_jitter()+
+        coord_cartesian(ylim=c(2, 5), xlim=c(0, 1000000))+
+        scale_x_sqrt()+
+        geom_smooth()+
+        labs(x='Count of text reviews', y='Average rating', title='Checking for correlation', 
+             subtitle='between count of ratings and average rating')+
+        theme(axis.text=element_text(size=18), plot.title = element_text(size = 40, face = "bold", hjust=0.5),axis.title=element_text(size=30),
+              plot.subtitle = element_text(size = 30, face = "bold", hjust=0.48))+
+        geom_text(aes(label=paste('p-value: ', round(cor.test(df$ratings_count, df$average_rating, method='pearson')$p.value, 7), '\n',
+                                  'correlation: ', round(cor.test(df$ratings_count, df$average_rating, method='pearson')$estimate, 3)), x=750000, y=4.75), size=10)
+    
+    #Books having more than 100000 ratings count
+    cat('Books having more than 100000 ratings count:', round(length(which(df$ratings_count>100000))/length(df$ratings_count), 3), '\n')
+    cat('They account for: ', round(sum(df[df$ratings_count>100000, 'ratings_count'])/sum(df$ratings_count), 3), 'of all ratings')
+    
+    })
     
 }
 
